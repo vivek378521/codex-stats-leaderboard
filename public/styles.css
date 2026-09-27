@@ -297,10 +297,11 @@ tbody tr:hover { background: rgba(15, 118, 110, 0.05); }
 
   tbody tr {
     border: 1px solid var(--line);
-    border-radius: 18px;
+    border-radius: 20px;
     background: rgba(255, 252, 246, 0.72);
-    padding: 6px 0;
-    margin-bottom: 12px;
+    padding: 18px 0 14px;
+    margin-bottom: 20px;
+    box-shadow: 0 22px 60px -34px rgba(72, 53, 36, 0.5);
   }
 
   tbody tr:last-child { margin-bottom: 0; }
@@ -311,23 +312,23 @@ tbody tr:hover { background: rgba(15, 118, 110, 0.05); }
     align-items: baseline;
     justify-content: space-between;
     gap: 16px;
-    padding: 6px 15px;
+    padding: 11px 20px;
     border-bottom: 0;
     white-space: normal;
     text-align: right;
   }
 
   /* Requests, sessions and cost are metadata beside the headline numbers, so
-     they are set smaller to keep each card from towering on a phone. */
+     they stay a step below the headline figures. */
   .col-extra,
-  .col-cost { font-size: 15px; }
+  .col-cost { font-size: 18px; }
   .col-extra::before,
-  .col-cost::before { font-size: 12px; }
+  .col-cost::before { font-size: 13px; }
 
   td::before {
     content: attr(data-label);
     flex: none;
-    font-size: 13px;
+    font-size: 14px;
     letter-spacing: 0.09em;
     text-transform: uppercase;
     color: var(--muted);
@@ -344,25 +345,25 @@ tbody tr:hover { background: rgba(15, 118, 110, 0.05); }
   .col-rank {
     width: auto;
     padding-bottom: 0;
-    font-size: 13px;
+    font-size: 14px;
     letter-spacing: 0.09em;
   }
 
   .col-rank::before { display: none; }
 
   .col-name {
-    font-size: 21px;
+    font-size: 24px;
     padding-top: 0;
-    padding-bottom: 10px;
+    padding-bottom: 14px;
     border-bottom: 1px solid var(--line);
-    margin-bottom: 4px;
+    margin-bottom: 6px;
   }
 
   .col-name::before { display: none; }
 
   .col-tokens {
-    font-size: 22px;
-    padding-top: 12px;
+    font-size: 27px;
+    padding-top: 16px;
   }
 
   .chips { justify-content: flex-end; }
@@ -373,6 +374,6 @@ tbody tr:hover { background: rgba(15, 118, 110, 0.05); }
   .page { width: calc(100vw - 24px); padding: 16px 0 40px; }
   .hero, .panel { border-radius: 20px; }
   .hero-meta { gap: 18px 28px; }
-  .col-name { font-size: 22px; }
-  .col-tokens { font-size: 24px; }
+  .col-name { font-size: 25px; }
+  .col-tokens { font-size: 28px; }
 }

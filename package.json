@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vercel dev",
     "deploy": "vercel --prod",
-    "init-db": "node scripts/init-db.mjs",
+    "init-db": "node --env-file-if-exists=.env scripts/init-db.mjs",
     "test": "node scripts/e2e-check.mjs",
     "preview": "node scripts/preview.mjs",
     "mock": "MOCK_FRESH=1 node scripts/mock-server.mjs"
