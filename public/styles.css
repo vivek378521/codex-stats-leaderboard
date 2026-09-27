@@ -21,17 +21,19 @@ body {
   margin: 0;
   color: var(--ink);
   font-family: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+  font-size: 17px;
   background:
     radial-gradient(circle at top left, rgba(15, 118, 110, 0.18), transparent 28%),
     radial-gradient(circle at top right, rgba(180, 83, 9, 0.16), transparent 26%),
     linear-gradient(180deg, #fbf6ee 0%, var(--bg) 52%, var(--bg-deep) 100%);
   min-height: 100vh;
+  -webkit-text-size-adjust: 100%;
 }
 
 .page {
-  width: min(1180px, calc(100vw - 32px));
+  width: min(1440px, calc(100vw - 40px));
   margin: 0 auto;
-  padding: 28px 0 56px;
+  padding: 32px 0 64px;
 }
 
 .hero,
@@ -42,7 +44,7 @@ body {
   box-shadow: var(--shadow);
 }
 
-.hero { padding: 28px; }
+.hero { padding: clamp(24px, 3vw, 40px); }
 
 .eyebrow {
   margin: 0 0 6px;
@@ -54,16 +56,16 @@ body {
 }
 
 h1 {
-  margin: 0 0 10px;
-  font-size: clamp(32px, 5vw, 52px);
+  margin: 0 0 12px;
+  font-size: clamp(34px, 4.4vw, 60px);
   line-height: 1.04;
 }
 
 .lede {
   margin: 0;
-  max-width: 62ch;
+  max-width: 68ch;
   color: var(--muted);
-  font-size: 18px;
+  font-size: clamp(16px, 1.2vw, 19px);
   line-height: 1.55;
 }
 
@@ -78,14 +80,18 @@ code {
 .hero-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 28px;
-  margin-top: 24px;
-  padding-top: 20px;
+  gap: clamp(24px, 5vw, 64px);
+  margin-top: clamp(20px, 2.4vw, 32px);
+  padding-top: clamp(18px, 2vw, 26px);
   border-top: 1px solid var(--line);
 }
 
 .stat { display: flex; flex-direction: column; gap: 2px; }
-.stat strong { font-size: 26px; line-height: 1.1; }
+.stat strong {
+  font-size: clamp(26px, 2.6vw, 36px);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
 .stat span {
   font-size: 12px;
   letter-spacing: 0.1em;
@@ -93,7 +99,10 @@ code {
   color: var(--muted);
 }
 
-.panel { margin-top: 22px; padding: 24px 28px 20px; }
+.panel {
+  margin-top: 24px;
+  padding: clamp(20px, 2.4vw, 32px) clamp(18px, 2.4vw, 32px) clamp(16px, 2vw, 24px);
+}
 
 .panel-head {
   display: flex;
@@ -101,31 +110,31 @@ code {
   gap: 10px;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 16px;
+  margin-bottom: clamp(14px, 1.6vw, 22px);
 }
 
-h2 { margin: 0; font-size: 24px; }
+h2 { margin: 0; font-size: clamp(21px, 1.8vw, 26px); }
 
-.muted { margin: 0; color: var(--muted); font-size: 14px; }
+.muted { margin: 0; color: var(--muted); font-size: 15px; }
 
 .table-wrap { overflow-x: auto; }
 
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 15px;
+  font-size: 17px;
 }
 
 th,
 td {
   text-align: left;
-  padding: 12px 10px;
+  padding: 15px 12px;
   border-bottom: 1px solid var(--line);
   white-space: nowrap;
 }
 
 th {
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
@@ -135,13 +144,17 @@ th {
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr:nth-child(1) td { font-weight: 700; }
 tbody tr:nth-child(1) .col-rank { color: var(--accent-2); }
+tbody tr { transition: background 140ms ease; }
+tbody tr:hover { background: rgba(15, 118, 110, 0.05); }
 
 .col-num { text-align: right; font-variant-numeric: tabular-nums; }
 .col-rank {
-  width: 52px;
+  width: 60px;
   font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
+.col-name { white-space: normal; overflow-wrap: anywhere; min-width: 130px; }
+.col-tokens { font-variant-numeric: tabular-nums; min-width: 92px; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 
@@ -149,9 +162,9 @@ tbody tr:nth-child(1) .col-rank { color: var(--accent-2); }
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 10px;
+  padding: 4px 11px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   background: rgba(72, 53, 36, 0.07);
   color: var(--muted);
@@ -159,10 +172,11 @@ tbody tr:nth-child(1) .col-rank { color: var(--accent-2); }
 
 .chip::before {
   content: "";
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: var(--chip-color, var(--muted));
+  flex: none;
 }
 
 .chip[data-cli="codex"] { --chip-color: var(--codex); }
@@ -182,13 +196,17 @@ tbody tr:nth-child(1) .col-rank { color: var(--accent-2); }
   gap: 12px;
   justify-content: space-between;
   align-items: center;
-  margin-top: 16px;
-  padding-top: 16px;
+  margin-top: clamp(14px, 1.6vw, 20px);
+  padding-top: clamp(14px, 1.6vw, 20px);
   border-top: 1px solid var(--line);
 }
 
 .action-button {
-  padding: 10px 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 11px 20px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--panel-strong);
@@ -205,9 +223,115 @@ tbody tr:nth-child(1) .col-rank { color: var(--accent-2); }
 }
 
 .footer {
-  margin: 22px 0 0;
+  margin: 24px 0 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.6;
-  max-width: 70ch;
+  max-width: 78ch;
+}
+
+/* Below this width seven columns stop fitting, so each row becomes a card and
+   every value carries its own label. Sideways scrolling hid most of the board
+   on a phone, which is worse than no board. */
+@media (max-width: 900px) {
+  .table-wrap { overflow-x: visible; }
+
+  thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: normal;
+  }
+
+  /* The hidden header still has nowrap cells, which report phantom width even
+     though they are clipped. Reset them so nothing overflows invisibly. */
+  thead th {
+    padding: 0;
+    border: 0;
+    white-space: normal;
+  }
+
+  table,
+  tbody,
+  tr,
+  td {
+    display: block;
+    width: 100%;
+  }
+
+  tbody tr {
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: rgba(255, 252, 246, 0.72);
+    padding: 6px 0;
+    margin-bottom: 12px;
+  }
+
+  tbody tr:last-child { margin-bottom: 0; }
+  tbody tr:nth-child(1) { border-color: rgba(180, 83, 9, 0.4); }
+
+  td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 9px 16px;
+    border-bottom: 0;
+    white-space: normal;
+    text-align: right;
+  }
+
+  td::before {
+    content: attr(data-label);
+    flex: none;
+    font-size: 12px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 700;
+  }
+
+  /* Rank and name read as the card heading, so they lead it. */
+  .col-rank,
+  .col-name {
+    justify-content: flex-start;
+    text-align: left;
+  }
+
+  .col-rank {
+    width: auto;
+    padding-bottom: 0;
+    font-size: 13px;
+    letter-spacing: 0.09em;
+  }
+
+  .col-rank::before { display: none; }
+
+  .col-name {
+    font-size: 21px;
+    padding-top: 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 4px;
+  }
+
+  .col-name::before { display: none; }
+
+  .col-tokens {
+    font-size: 22px;
+    padding-top: 12px;
+  }
+
+  .chips { justify-content: flex-end; }
+}
+
+@media (max-width: 560px) {
+  body { font-size: 16px; }
+  .page { width: calc(100vw - 24px); padding: 16px 0 40px; }
+  .hero, .panel { border-radius: 20px; }
+  .hero-meta { gap: 18px 28px; }
+  .col-name { font-size: 19px; }
+  .col-tokens { font-size: 20px; }
 }

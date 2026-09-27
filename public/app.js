@@ -56,18 +56,22 @@ function relativeTime(isoString) {
   return new Date(then).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function cell(row, text, className) {
+function cell(row, text, className, label) {
   const td = document.createElement("td");
   td.textContent = text;
   if (className) {
     td.className = className;
   }
+  // Read back as a label by the card layout on narrow screens.
+  td.dataset.label = label;
   row.appendChild(td);
   return td;
 }
 
 function cliChips(clis) {
   const td = document.createElement("td");
+  td.className = "col-clis";
+  td.dataset.label = "CLIs";
   const wrap = document.createElement("div");
   wrap.className = "chips";
   const keys = Object.keys(clis ?? {}).sort();
@@ -90,13 +94,13 @@ function render(entries, total) {
   rowsBody.replaceChildren();
   for (const entry of entries) {
     const row = document.createElement("tr");
-    cell(row, `#${entry.rank}`, "col-rank");
-    cell(row, entry.username);
-    cell(row, formatTokens(entry.totalTokens), "col-num");
+    cell(row, `#${entry.rank}`, "col-rank", "Rank");
+    cell(row, entry.username, "col-name", "Name");
+    cell(row, formatTokens(entry.totalTokens), "col-num col-tokens", "Tokens");
     row.appendChild(cliChips(entry.clis));
-    cell(row, numberFormat.format(entry.requests), "col-num");
-    cell(row, numberFormat.format(entry.sessions), "col-num");
-    cell(row, formatCost(entry.costUsd), "col-num");
+    cell(row, numberFormat.format(entry.requests), "col-num", "Requests");
+    cell(row, numberFormat.format(entry.sessions), "col-num", "Sessions");
+    cell(row, formatCost(entry.costUsd), "col-num", "Est. cost");
     rowsBody.appendChild(row);
   }
 
