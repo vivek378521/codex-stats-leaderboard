@@ -5,6 +5,28 @@ export const config = { runtime: "nodejs" };
 
 const MAX_LIMIT = 500;
 const DEFAULT_LIMIT = 100;
+// Upper bound on how much of the chain one request will read back to recompute
+// it. Set well above the board cap so reaching it would take years of normal
+// use, and low enough that a single request cannot be made to pull an unbounded
+// amount of data. Past it the response says the check did not cover everything
+// rather than reporting a clean bill of health.
+const MAX_VERIFIED_ENTRIES = 50_000;
+
+/** Read the first `count` log rows in pages, so verification is not a single huge query. */
+async function readPagedLog(count) {
+  if (count <= 0) {
+    return [];
+  }
+  const collected = [];
+  while (collected.length < count) {
+    const page = await readLog(Math.min(MAX_LIMIT, count - collected.length), collected.length);
+    if (page.length === 0) {
+      break;
+    }
+    collected.push(...page);
+  }
+  return collected;
+}
 
 function parseClis(raw) {
   try {
@@ -42,8 +64,15 @@ export default async function handler(req, res) {
     // Verifying only a page would be misleading: a break earlier in the history
     // changes the expected prev_hash of the first row in this page, so paging
     // changes what "valid" means. Read the whole chain for the check.
-    const all = offset === 0 && limit >= total ? rows : await readLog(MAX_LIMIT * 20, 0);
+    //
+    // A previous version read a fixed 10,000 rows and stopped, which meant a
+    // longer log was reported intact while the tail went unverified. Past the
+    // bound the answer is "not determined" rather than a guess: claims have to
+    // be able to mean what they say.
+    const covered = Math.min(total, MAX_VERIFIED_ENTRIES);
+    const all = await readPagedLog(covered);
     const verdict = verifyChain(all);
+    const fullyCovered = covered === total;
 
     return res.status(200).json({
       ok: true,
@@ -55,6 +84,11 @@ export default async function handler(req, res) {
         brokenAt: verdict.brokenAt,
         reason: verdict.reason,
         intact: verdict.ok,
+        entriesVerified: covered,
+        // A break inside the covered window is a real finding, so intact stays
+        // true there. Beyond the window there is no answer, and reporting true
+        // would be claiming a check that did not run.
+        verdictReachedEnd: fullyCovered,
         note:
           "Each entry hashes the previous one, so editing a logged submission, or " +
           "removing one from the middle, breaks the chain at a specific sequence " +

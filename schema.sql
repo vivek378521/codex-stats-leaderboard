@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS submission_log (
      entry_hash TEXT NOT NULL
    );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_submission_log_hash ON submission_log (entry_hash);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_submission_log_prev ON submission_log (prev_hash);
 CREATE TABLE IF NOT EXISTS rate_limits (
      subject TEXT PRIMARY KEY,
      window_start INTEGER NOT NULL,

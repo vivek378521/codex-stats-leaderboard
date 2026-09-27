@@ -2,10 +2,9 @@ import { isFresh, verifySignature } from "../lib/signing.js";
 import { parseSubmission } from "../lib/validate.js";
 import { entryHash, GENESIS_HASH } from "../lib/chain.js";
 import {
-  appendLog,
+  appendLogWithHead,
   bumpRateLimit,
   countEntries,
-  currentChainHead,
   ensureSchema,
   findEntry,
   rankFor,
@@ -136,9 +135,9 @@ export default async function handler(req, res) {
     await upsertEntry({ ...record, created_at: createdAt, updated_at: now });
 
     // Logged only after the row is durably written, so the chain never claims a
-    // write that did not happen.
-    const prevHash = await currentChainHead();
-    await appendLog({ ...record, recorded_at: now }, prevHash, entryHash(prevHash, record));
+    // write that did not happen. appendLogWithHead re-reads the head and retries
+    // if a concurrent submission won the race, so the chain cannot fork.
+    await appendLogWithHead({ ...record, recorded_at: now }, entryHash);
 
     const rank = await rankFor(submission.total_tokens, createdAt);
     return res.status(200).json({

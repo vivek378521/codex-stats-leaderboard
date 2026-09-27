@@ -17,7 +17,8 @@ import { createClient } from "@libsql/client";
 import submitHandler from "../api/submit.js";
 import leaderboardHandler from "../api/leaderboard.js";
 import logHandler from "../api/log.js";
-import { readLog } from "../lib/db.js";
+import { readLog, appendLogWithHead } from "../lib/db.js";
+import { entryHash, verifyChain } from "../lib/chain.js";
 
 const KEY = "e2e-shared-key";
 const DB_PATH = join(tmpdir(), `codex-stats-e2e-${process.pid}.db`);
@@ -249,6 +250,8 @@ const chain = log.body?.chain;
 // downgrade is rejected before it is logged, so it must not appear here.
 check("log records every accepted submission", log.body?.total === 5, JSON.stringify(log.body?.total));
 check("chain verifies intact", chain?.intact === true, JSON.stringify(chain));
+check("the response says how much of the chain it actually checked", chain?.entriesVerified === log.body?.total, JSON.stringify(chain));
+check("and that the check reached the end of the log", chain?.verdictReachedEnd === true, JSON.stringify(chain));
 check("genesis entry links to all zeroes", log.body?.entries?.[0]?.prevHash === "0".repeat(64), log.body?.entries?.[0]?.prevHash);
 const links = (log.body?.entries ?? []).every((entry, i, all) => i === 0 || entry.prevHash === all[i - 1].entryHash);
 check("every entry hashes the previous one", links);
@@ -258,33 +261,108 @@ const logPost = mockRes();
 await logHandler({ method: "POST", query: {} }, logPost);
 check("log rejects POST", logPost.statusCode === 405);
 
-// The point of the chain: a rewrite must be detectable. Edit a logged total
-// directly in the database, the way an operator trying to hide something would,
-// and check that verification notices.
-const original = await client.execute("SELECT seq, total_tokens FROM submission_log ORDER BY seq ASC LIMIT 1");
-const victim = original.rows[0];
+// Snapshot the chain so the tamper scenarios below can be run independently
+// instead of each one building on whatever the last left behind. The earlier
+// version deleted the first row to test mid-chain removal and then deleted
+// everything to test tail removal, so the "prefix" case never had a prefix.
+const snapshot = await readLog(100, 0);
+async function restoreLog() {
+  await client.execute("DELETE FROM submission_log");
+  for (const row of snapshot) {
+    await client.execute({
+      sql: `INSERT INTO submission_log
+            (seq, device_id, username, total_tokens, requests, sessions, cost_micros, clis, recorded_at, prev_hash, entry_hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [Number(row.seq), row.device_id, row.username, Number(row.total_tokens), Number(row.requests),
+             Number(row.sessions), Number(row.cost_micros), row.clis, row.recorded_at, row.prev_hash, row.entry_hash],
+    });
+  }
+}
+check("snapshot captured for independent tamper tests", snapshot.length === 5, `${snapshot.length} rows`);
+
+// Tail truncation: remove the last entry and the remaining prefix still verifies,
+// because a prefix of a valid chain is itself a valid chain. This is a property of
+// hash chains generally, not a bug, so it is pinned here and stated in the API note
+// and the page footer rather than left as a surprise.
+const lastEntry = snapshot.at(-1);
+await client.execute({ sql: "DELETE FROM submission_log WHERE seq = ?", args: [Number(lastEntry.seq)] });
+const tailGone = await callLog();
+check("dropping entries from the end is NOT detectable (known limit)", tailGone.body?.chain?.intact === true, JSON.stringify(tailGone.body?.chain));
+check("a real prefix still verifies, not an empty log", tailGone.body?.chain?.verified === snapshot.length - 1, JSON.stringify(tailGone.body?.chain));
+check("the shortened chain still links end to end", (tailGone.body?.entries ?? []).every((e, i, all) => i === 0 || e.prevHash === all[i - 1].entryHash));
+
+// The fix for that needs the head published somewhere immutable, and there is no
+// such field anywhere in the log or the response. Assert its absence.
+check("no head anchor is published, which is the actual gap", !JSON.stringify(tailGone.body).match(/"(head|anchor|checkpoint)Hash"/i), "no externally anchored head");
+await restoreLog();
+
+// Editing a logged total directly, the way an operator trying to hide something
+// would, must be caught at that exact sequence number.
+const victim = snapshot[0];
 await client.execute({ sql: "UPDATE submission_log SET total_tokens = ? WHERE seq = ?", args: [999_999_999, Number(victim.seq)] });
 const tampered = await callLog();
 check("tampering with a logged total is detected", tampered.body?.chain?.intact === false, JSON.stringify(tampered.body?.chain));
 check("the break is pinned to a sequence number", tampered.body?.chain?.brokenAt === Number(victim.seq), JSON.stringify(tampered.body?.chain));
+await restoreLog();
 
-// Deleting an entry from the middle breaks the links either side of it.
-await client.execute({ sql: "UPDATE submission_log SET total_tokens = ? WHERE seq = ?", args: [Number(victim.total_tokens), Number(victim.seq)] });
+// Deleting an entry from the middle breaks the links either side of it: the next
+// entry's prev_hash no longer matches anything.
 await client.execute({ sql: "DELETE FROM submission_log WHERE seq = ?", args: [Number(victim.seq)] });
 const deleted = await callLog();
 check("removing a mid-chain entry is detected", deleted.body?.chain?.intact === false, JSON.stringify(deleted.body?.chain));
+check("the break points at the entry that should have been there", deleted.body?.chain?.verified === 0, JSON.stringify(deleted.body?.chain));
+await restoreLog();
 
-// A limitation of hash chains in general, pinned here so it is not forgotten: a
-// prefix of a valid chain is itself valid, so dropping entries from the *end*
-// cannot be detected without the head hash published somewhere immutable. The
-// API note and the page footer both say so.
-const headBefore = (await readLog(500, 0)).at(-1)?.entry_hash;
-await client.execute({ sql: "DELETE FROM submission_log WHERE seq > ?", args: [Number(victim.seq) - 1] });
-const truncated = await callLog();
-check("dropping entries from the end is NOT detectable (known limit)", truncated.body?.chain?.intact === true, JSON.stringify(truncated.body?.chain));
-check("and the head hash is not published anywhere immutable", headBefore !== undefined, "head anchor is not exposed, which is the actual gap");
+// A server-side fork would be indistinguishable from tampering, so the database
+// refuses to record one: prev_hash is unique, because a linear chain gives every
+// entry a distinct parent. Two concurrent submissions that read the same head
+// would otherwise both insert, and the chain would break itself.
+const forkRecord = { device_id: "fork", username: "fork", total_tokens: 1, requests: 1, sessions: 1, cost_micros: 0, clis: { codex: 1 }, recorded_at: new Date().toISOString() };
+let forkRejected = false;
+try {
+  await client.execute({
+    sql: `INSERT INTO submission_log
+          (device_id, username, total_tokens, requests, sessions, cost_micros, clis, recorded_at, prev_hash, entry_hash)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: ["fork", "fork", 1, 1, 1, 0, JSON.stringify({ codex: 1 }), forkRecord.recorded_at,
+           String(snapshot[0].prev_hash), entryHash(String(snapshot[0].prev_hash), forkRecord)],
+  });
+} catch (error) {
+  forkRejected = /UNIQUE constraint failed/i.test(String(error?.message ?? ""));
+}
+check("two entries claiming the same parent are rejected", forkRejected, "prev_hash is unique, so a concurrent race cannot fork the chain");
+const afterFork = await callLog();
+check("the chain is still intact after the rejected fork", afterFork.body?.chain?.intact === true, JSON.stringify(afterFork.body?.chain));
+check("genesis is still the only entry using the genesis prev_hash", afterFork.body?.chain?.verified === snapshot.length, JSON.stringify(afterFork.body?.chain));
 
-console.log("\n13. Rate limiting");
+console.log("\n13. Concurrent appends cannot fork the chain");
+await restoreLog();
+// A real request path would serialise on a transaction. This one cannot, because
+// the entry hash is computed in JavaScript from the head, so the head read and
+// the insert are necessarily separate. The UNIQUE index on prev_hash plus a
+// jittered retry is what stops that becoming a fork. Before the backoff was
+// added, 40 simultaneous appends left 5 through and failed the rest; the chain
+// stayed valid, but most submissions were lost.
+const racers = 60;
+const raceResults = await Promise.allSettled(
+  Array.from({ length: racers }, (_, i) =>
+    appendLogWithHead(
+      { device_id: `race${i}`, username: `race${i}`, total_tokens: i + 1, requests: 1, sessions: 1, cost_micros: 0, clis: { codex: i + 1 }, recorded_at: new Date().toISOString() },
+      entryHash,
+    ),
+  ),
+);
+const raced = raceResults.filter((r) => r.status === "fulfilled").length;
+const worstAttempts = Math.max(...raceResults.filter((r) => r.status === "fulfilled").map((r) => r.value.attempts));
+check("every simultaneous append lands", raced === racers, `${raced}/${racers}`);
+check("a losing race retries rather than failing", worstAttempts > 1, `worst case ${worstAttempts} attempts`);
+const racedRows = await readLog(1000, 0);
+const racedVerdict = verifyChain(racedRows);
+check("the chain is still intact after the burst", racedVerdict.ok === true, JSON.stringify(racedVerdict));
+check("every entry has a distinct parent", new Set(racedRows.map((r) => r.prev_hash)).size === racedRows.length, `${racedRows.length} entries`);
+await restoreLog();
+
+console.log("\n14. Rate limiting");
 const savedLimit = process.env.RATE_LIMIT_PER_IP;
 process.env.RATE_LIMIT_PER_IP = "2";
 const rl = createClient({ url: `file:${DB_PATH}` });
