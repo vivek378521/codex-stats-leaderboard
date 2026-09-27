@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>codex-stats leaderboard</title>
+  <meta name="description" content="All-time coding agent token totals, submitted from codex-stats.">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <p class="eyebrow">codex-stats</p>
+      <h1>Every tool, one board.</h1>
+      <p class="lede">
+        All-time token totals, read straight from your local coding-agent history by
+        <code>codex-stats</code>. Run <code>codex-stats</code>, then hit
+        <em>Submit to Leaderboard</em> in the dashboard to add yourself.
+      </p>
+      <div class="hero-meta">
+        <div class="stat">
+          <strong data-total-entries>—</strong>
+          <span>submissions</span>
+        </div>
+        <div class="stat">
+          <strong data-total-tokens>—</strong>
+          <span>tokens tracked</span>
+        </div>
+        <div class="stat">
+          <strong data-last-updated>—</strong>
+          <span>last update</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>All-time token totals</h2>
+        <p class="muted" data-status>Loading…</p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="col-rank">#</th>
+              <th>Name</th>
+              <th class="col-num">Tokens</th>
+              <th>CLIs used</th>
+              <th class="col-num">Requests</th>
+              <th class="col-num">Sessions</th>
+              <th class="col-num">Est. cost</th>
+            </tr>
+          </thead>
+          <tbody data-rows></tbody>
+        </table>
+      </div>
+      <p class="empty" data-empty hidden>No submissions yet. Be the first.</p>
+      <div class="panel-foot">
+        <button class="action-button" type="button" data-refresh>Refresh</button>
+        <span class="muted" data-count></span>
+      </div>
+    </section>
+
+    <p class="footer">
+      Totals are computed locally by <code>codex-stats</code> and signed before upload.
+      Only the aggregate is ever sent; session paths, prompts, and model keys stay on your machine.
+    </p>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
