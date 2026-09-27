@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>codex-stats leaderboard</title>
   <meta name="description" content="All-time coding agent token totals, submitted from codex-stats.">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/favicon.ico">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -61,9 +64,31 @@
       </div>
     </section>
 
+    <section class="cta">
+      <h2 class="cta-title">Join the board</h2>
+      <p class="cta-lede">
+        Totals are computed on your machine and signed before upload. Only the aggregate
+        is ever sent &mdash; session paths, prompts, and model keys stay local.
+      </p>
+      <div class="cta-actions">
+        <code class="cta-cmd" data-install>pipx install codex-stats</code>
+        <button class="cta-copy" type="button" data-copy>Copy</button>
+      </div>
+      <p class="cta-links">
+        <a href="https://github.com/vivek378521/codex-stats" rel="noopener">codex-stats on GitHub</a>
+        <span aria-hidden="true">&middot;</span>
+        <a href="/api/log" rel="noopener">audit log</a>
+        <span aria-hidden="true">&middot;</span>
+        <a href="https://pypi.org/project/codex-stats/" rel="noopener">PyPI</a>
+      </p>
+      <p class="cta-note">Needs Python 3.11 or newer. Then run <code>codex-stats</code>.</p>
+    </section>
+
     <p class="footer">
-      Totals are computed locally by <code>codex-stats</code> and signed before upload.
-      Only the aggregate is ever sent; session paths, prompts, and model keys stay on your machine.
+      The signing key ships inside <code>codex-stats</code>, so anyone can submit numbers for
+      their own row. The <a href="/api/log">hash-chained log</a> makes edits to past entries
+      detectable, but it cannot tell you the totals were honest, and dropping recent entries
+      from the end would go unnoticed.
     </p>
   </main>
   <script src="/app.js"></script>

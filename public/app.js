@@ -142,3 +142,37 @@ async function load() {
 refreshButton.addEventListener("click", load);
 load();
 setInterval(load, 30000);
+
+// Copy-to-clipboard for the install command. navigator.clipboard needs a secure
+// context, which plain http on a LAN address is not, so fall back to a hidden
+// textarea and execCommand rather than leaving the button silently dead.
+const copyButton = document.querySelector("[data-copy]");
+const installCommand = document.querySelector("[data-install]");
+if (copyButton && installCommand) {
+  copyButton.addEventListener("click", async () => {
+    const text = installCommand.textContent.trim();
+    const original = copyButton.textContent;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const scratch = document.createElement("textarea");
+        scratch.value = text;
+        scratch.setAttribute("readonly", "");
+        scratch.style.position = "fixed";
+        scratch.style.opacity = "0";
+        document.body.append(scratch);
+        scratch.select();
+        const copied = document.execCommand("copy");
+        scratch.remove();
+        if (!copied) throw new Error("copy rejected");
+      }
+      copyButton.textContent = "Copied";
+    } catch {
+      copyButton.textContent = "Press ⌘C";
+    }
+    setTimeout(() => {
+      copyButton.textContent = original;
+    }, 1800);
+  });
+}

@@ -18,6 +18,7 @@ import { createClient } from "@libsql/client";
 
 import submitHandler from "../api/submit.js";
 import leaderboardHandler from "../api/leaderboard.js";
+import logHandler from "../api/log.js";
 import { ensureSchema } from "../lib/db.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -32,6 +33,7 @@ const CONTENT_TYPES = {
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
 };
 
 if (FRESH) {
@@ -121,7 +123,18 @@ const server = createServer(async (req, res) => {
   if (url.pathname.startsWith("/api/")) {
     const body = await readBody(req);
     const query = Object.fromEntries(url.searchParams.entries());
-    const handler = url.pathname === "/api/leaderboard" ? leaderboardHandler : submitHandler;
+    const ROUTES = {
+      "/api/leaderboard": leaderboardHandler,
+      "/api/log": logHandler,
+      "/api/submit": submitHandler,
+    };
+    const handler = ROUTES[url.pathname];
+    if (!handler) {
+      res.statusCode = 404;
+      res.setHeader("Content-Type", "application/json; charset=utf-8");
+      res.end(JSON.stringify({ ok: false, error: `No such endpoint: ${url.pathname}` }));
+      return;
+    }
     try {
       await handler({ method: req.method, path: url.pathname, body, query }, {
         setHeader: (key, value) => res.setHeader(key, value),

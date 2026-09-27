@@ -16,6 +16,8 @@ import { createClient } from "@libsql/client";
 
 import submitHandler from "../api/submit.js";
 import leaderboardHandler from "../api/leaderboard.js";
+import logHandler from "../api/log.js";
+import { readLog } from "../lib/db.js";
 
 const KEY = "e2e-shared-key";
 const DB_PATH = join(tmpdir(), `codex-stats-e2e-${process.pid}.db`);
@@ -34,6 +36,10 @@ rmSync(DB_PATH, { force: true });
 process.env.TURSO_DATABASE_URL = `file:${DB_PATH}`;
 process.env.TURSO_AUTH_TOKEN = "";
 process.env.LEADERBOARD_SUBMIT_KEY = KEY;
+// This script fires many signed submissions from a single address, which is
+// exactly the traffic the production rate limit exists to throttle. Raise it
+// rather than let unrelated assertions fail on a 429.
+process.env.RATE_LIMIT_PER_IP = "1000";
 
 let failures = 0;
 
@@ -229,6 +235,68 @@ check("submit rejects GET", submitGet.statusCode === 405);
 const client = createClient({ url: `file:${DB_PATH}` });
 const rows = await client.execute("SELECT COUNT(*) AS n FROM entries");
 check("database holds exactly 2 rows", Number(rows.rows[0].n) === 2, JSON.stringify(rows.rows[0]));
+
+console.log("\n12. Audit log and hash chain");
+async function callLog(query = {}) {
+  const res = mockRes();
+  await logHandler({ method: "GET", query }, res);
+  return res;
+}
+
+const log = await callLog();
+const chain = log.body?.chain;
+// Five accepted: ada 1500, bob 9000, ada 1600, ada 20000, ada 21000. The 409
+// downgrade is rejected before it is logged, so it must not appear here.
+check("log records every accepted submission", log.body?.total === 5, JSON.stringify(log.body?.total));
+check("chain verifies intact", chain?.intact === true, JSON.stringify(chain));
+check("genesis entry links to all zeroes", log.body?.entries?.[0]?.prevHash === "0".repeat(64), log.body?.entries?.[0]?.prevHash);
+const links = (log.body?.entries ?? []).every((entry, i, all) => i === 0 || entry.prevHash === all[i - 1].entryHash);
+check("every entry hashes the previous one", links);
+check("entry hashes are 64 hex chars", (log.body?.entries ?? []).every((e) => /^[0-9a-f]{64}$/.test(e.entryHash)));
+check("log does not expose device ids", !JSON.stringify(log.body).includes("device_id"));
+const logPost = mockRes();
+await logHandler({ method: "POST", query: {} }, logPost);
+check("log rejects POST", logPost.statusCode === 405);
+
+// The point of the chain: a rewrite must be detectable. Edit a logged total
+// directly in the database, the way an operator trying to hide something would,
+// and check that verification notices.
+const original = await client.execute("SELECT seq, total_tokens FROM submission_log ORDER BY seq ASC LIMIT 1");
+const victim = original.rows[0];
+await client.execute({ sql: "UPDATE submission_log SET total_tokens = ? WHERE seq = ?", args: [999_999_999, Number(victim.seq)] });
+const tampered = await callLog();
+check("tampering with a logged total is detected", tampered.body?.chain?.intact === false, JSON.stringify(tampered.body?.chain));
+check("the break is pinned to a sequence number", tampered.body?.chain?.brokenAt === Number(victim.seq), JSON.stringify(tampered.body?.chain));
+
+// Deleting an entry from the middle breaks the links either side of it.
+await client.execute({ sql: "UPDATE submission_log SET total_tokens = ? WHERE seq = ?", args: [Number(victim.total_tokens), Number(victim.seq)] });
+await client.execute({ sql: "DELETE FROM submission_log WHERE seq = ?", args: [Number(victim.seq)] });
+const deleted = await callLog();
+check("removing a mid-chain entry is detected", deleted.body?.chain?.intact === false, JSON.stringify(deleted.body?.chain));
+
+// A limitation of hash chains in general, pinned here so it is not forgotten: a
+// prefix of a valid chain is itself valid, so dropping entries from the *end*
+// cannot be detected without the head hash published somewhere immutable. The
+// API note and the page footer both say so.
+const headBefore = (await readLog(500, 0)).at(-1)?.entry_hash;
+await client.execute({ sql: "DELETE FROM submission_log WHERE seq > ?", args: [Number(victim.seq) - 1] });
+const truncated = await callLog();
+check("dropping entries from the end is NOT detectable (known limit)", truncated.body?.chain?.intact === true, JSON.stringify(truncated.body?.chain));
+check("and the head hash is not published anywhere immutable", headBefore !== undefined, "head anchor is not exposed, which is the actual gap");
+
+console.log("\n13. Rate limiting");
+const savedLimit = process.env.RATE_LIMIT_PER_IP;
+process.env.RATE_LIMIT_PER_IP = "2";
+const rl = createClient({ url: `file:${DB_PATH}` });
+await rl.execute("DELETE FROM rate_limits");
+const burst = [];
+for (let i = 0; i < 4; i += 1) {
+  burst.push(await callSubmit(signWithPython({ username: "burst", tokens: 100 + i, clis: { codex: 100 + i }, ts: now, mac: "c00c00000003" })));
+}
+check("requests past the limit are throttled", burst[3].statusCode === 429, JSON.stringify(burst.map((b) => b.statusCode)));
+check("throttled request says why", /too many/i.test(burst[3].body?.error ?? ""), burst[3].body?.error);
+check("requests under the limit still succeed", burst[0].statusCode === 200 && burst[1].statusCode === 200, JSON.stringify(burst.map((b) => b.statusCode)));
+process.env.RATE_LIMIT_PER_IP = savedLimit;
 
 rmSync(DB_PATH, { force: true });
 console.log(failures === 0 ? "\nAll end-to-end checks passed." : `\n${failures} check(s) failed.`);

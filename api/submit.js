@@ -1,8 +1,44 @@
 import { isFresh, verifySignature } from "../lib/signing.js";
 import { parseSubmission } from "../lib/validate.js";
-import { ensureSchema, findEntry, rankFor, upsertEntry } from "../lib/db.js";
+import { entryHash, GENESIS_HASH } from "../lib/chain.js";
+import {
+  appendLog,
+  bumpRateLimit,
+  countEntries,
+  currentChainHead,
+  ensureSchema,
+  findEntry,
+  rankFor,
+  upsertEntry,
+} from "../lib/db.js";
 
 export const config = { runtime: "nodejs" };
+
+// The signing key is public, so these are not about secrecy. They bound how much
+// damage one actor can do: MAX_ROWS caps the board, and the per-IP window stops
+// bulk filling it.
+//
+// Read per request rather than once at module load. A module-level constant would
+// freeze the values at import time, which makes them impossible to exercise from
+// the test suite and ties any change to a redeploy.
+const RATE_LIMIT_WINDOW_SECONDS = 3600;
+
+function maxSubmissionsPerIp() {
+  const raw = Number(process.env.RATE_LIMIT_PER_IP);
+  return Number.isFinite(raw) && raw > 0 ? raw : 20;
+}
+
+function maxRows() {
+  const raw = Number(process.env.MAX_BOARD_ROWS);
+  return Number.isFinite(raw) && raw > 0 ? raw : 10_000;
+}
+
+/** Best-effort client address. Spoofable via x-forwarded-for, so treat it as a hint. */
+function clientAddress(req) {
+  const forwarded = String(req.headers?.["x-forwarded-for"] ?? "");
+  const first = forwarded.split(",")[0].trim();
+  return first || String(req.headers?.["x-real-ip"] ?? "unknown");
+}
 
 function readBody(req) {
   if (typeof req.body === "string") {
@@ -53,6 +89,19 @@ export default async function handler(req, res) {
 
   try {
     await ensureSchema();
+
+    // Rate limiting runs after the signature check so that forged junk from a
+    // single address cannot be used to lock a legitimate user out of submitting.
+    const address = clientAddress(req);
+    const attempts = await bumpRateLimit(address, RATE_LIMIT_WINDOW_SECONDS, Date.now() / 1000);
+    if (attempts > maxSubmissionsPerIp()) {
+      res.setHeader("Retry-After", String(RATE_LIMIT_WINDOW_SECONDS));
+      return res.status(429).json({
+        ok: false,
+        error: "Too many submissions from this network. Try again later.",
+      });
+    }
+
     const existing = await findEntry(submission.device_id);
 
     // All-time token counts only ever grow. A smaller number means the local
@@ -67,9 +116,15 @@ export default async function handler(req, res) {
       });
     }
 
+    // A new row counts against the board cap; a resubmission of an existing row
+    // does not, otherwise the cap would punish someone for correcting a typo.
+    if (!existing && (await countEntries()) >= maxRows()) {
+      return res.status(503).json({ ok: false, error: "The leaderboard is full." });
+    }
+
     const now = new Date().toISOString();
     const createdAt = existing ? String(existing.created_at) : now;
-    await upsertEntry({
+    const record = {
       device_id: submission.device_id,
       username: submission.username,
       total_tokens: submission.total_tokens,
@@ -77,9 +132,13 @@ export default async function handler(req, res) {
       sessions: submission.sessions,
       cost_micros: submission.cost_micros,
       clis: submission.clis,
-      created_at: createdAt,
-      updated_at: now,
-    });
+    };
+    await upsertEntry({ ...record, created_at: createdAt, updated_at: now });
+
+    // Logged only after the row is durably written, so the chain never claims a
+    // write that did not happen.
+    const prevHash = await currentChainHead();
+    await appendLog({ ...record, recorded_at: now }, prevHash, entryHash(prevHash, record));
 
     const rank = await rankFor(submission.total_tokens, createdAt);
     return res.status(200).json({

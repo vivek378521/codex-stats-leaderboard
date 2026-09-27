@@ -377,3 +377,90 @@ tbody tr:hover { background: rgba(15, 118, 110, 0.05); }
   .col-name { font-size: 25px; }
   .col-tokens { font-size: 28px; }
 }
+
+/* ------------------------------------------------------------------ install */
+
+/* Kept deliberately small and centred: a call to action, not a second hero. */
+.cta {
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 28px 32px 24px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--panel-strong);
+  text-align: center;
+  box-shadow: 0 26px 70px -40px rgba(72, 53, 36, 0.5);
+}
+
+.cta-title {
+  margin: 0 0 8px;
+  font-size: clamp(21px, 2vw, 25px);
+  letter-spacing: -0.01em;
+}
+
+.cta-lede {
+  margin: 0 auto 18px;
+  max-width: 46ch;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.cta-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cta-cmd {
+  padding: 11px 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink);
+  user-select: all;
+}
+
+.cta-copy {
+  min-height: 44px;
+  padding: 10px 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  font: inherit;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.cta-copy:hover { background: var(--panel-strong); }
+
+.cta-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 18px 0 0;
+  font-size: 15px;
+}
+
+.cta-note {
+  margin: 10px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.cta-note code { font-size: 14px; }
+
+.footer a { color: var(--accent); }
+
+@media (max-width: 560px) {
+  .cta { padding: 24px 18px 20px; }
+  .cta-lede { font-size: 15px; }
+  .cta-cmd { font-size: 16px; }
+}
