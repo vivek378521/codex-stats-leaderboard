@@ -79,11 +79,19 @@ function cliChips(clis) {
     wrap.textContent = "—";
   }
   for (const key of keys) {
+    const label = CLI_LABELS[key] ?? key;
     const chip = document.createElement("span");
     chip.className = "chip";
     chip.dataset.cli = key;
-    chip.textContent = CLI_LABELS[key] ?? key;
-    chip.title = `${numberFormat.format(clis[key])} tokens`;
+    // The name lives in a child span so a narrow layout can hide it visually
+    // while leaving it in the accessibility tree, and the aria-label keeps the
+    // token count announced even once the label is clipped away.
+    const name = document.createElement("span");
+    name.className = "chip-label";
+    name.textContent = label;
+    chip.append(name);
+    chip.title = `${label}: ${numberFormat.format(clis[key])} tokens`;
+    chip.setAttribute("aria-label", chip.title);
     wrap.appendChild(chip);
   }
   td.appendChild(wrap);
@@ -98,9 +106,9 @@ function render(entries, total) {
     cell(row, entry.username, "col-name", "Name");
     cell(row, formatTokens(entry.totalTokens), "col-num col-tokens", "Tokens");
     row.appendChild(cliChips(entry.clis));
-    cell(row, numberFormat.format(entry.requests), "col-num", "Requests");
-    cell(row, numberFormat.format(entry.sessions), "col-num", "Sessions");
-    cell(row, formatCost(entry.costUsd), "col-num", "Est. cost");
+    cell(row, numberFormat.format(entry.requests), "col-num col-extra", "Requests");
+    cell(row, numberFormat.format(entry.sessions), "col-num col-extra", "Sessions");
+    cell(row, formatCost(entry.costUsd), "col-num col-cost", "Est. cost");
     rowsBody.appendChild(row);
   }
 

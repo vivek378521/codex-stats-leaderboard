@@ -21,7 +21,7 @@ body {
   margin: 0;
   color: var(--ink);
   font-family: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
-  font-size: 17px;
+  font-size: 19px;
   background:
     radial-gradient(circle at top left, rgba(15, 118, 110, 0.18), transparent 28%),
     radial-gradient(circle at top right, rgba(180, 83, 9, 0.16), transparent 26%),
@@ -57,7 +57,7 @@ body {
 
 h1 {
   margin: 0 0 12px;
-  font-size: clamp(34px, 4.4vw, 60px);
+  font-size: clamp(38px, 5vw, 68px);
   line-height: 1.04;
 }
 
@@ -65,7 +65,7 @@ h1 {
   margin: 0;
   max-width: 68ch;
   color: var(--muted);
-  font-size: clamp(16px, 1.2vw, 19px);
+  font-size: clamp(17px, 1.3vw, 21px);
   line-height: 1.55;
 }
 
@@ -88,7 +88,7 @@ code {
 
 .stat { display: flex; flex-direction: column; gap: 2px; }
 .stat strong {
-  font-size: clamp(26px, 2.6vw, 36px);
+  font-size: clamp(28px, 2.8vw, 40px);
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }
@@ -122,19 +122,19 @@ h2 { margin: 0; font-size: clamp(21px, 1.8vw, 26px); }
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 17px;
+  font-size: 20px;
 }
 
 th,
 td {
   text-align: left;
-  padding: 15px 12px;
+  padding: 19px 14px;
   border-bottom: 1px solid var(--line);
   white-space: nowrap;
 }
 
 th {
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
@@ -149,12 +149,13 @@ tbody tr:hover { background: rgba(15, 118, 110, 0.05); }
 
 .col-num { text-align: right; font-variant-numeric: tabular-nums; }
 .col-rank {
-  width: 60px;
+  width: 72px;
+  font-size: 22px;
   font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
-.col-name { white-space: normal; overflow-wrap: anywhere; min-width: 130px; }
-.col-tokens { font-variant-numeric: tabular-nums; min-width: 92px; }
+.col-name { white-space: normal; overflow-wrap: anywhere; min-width: 150px; font-size: 21px; }
+.col-tokens { font-variant-numeric: tabular-nums; min-width: 110px; font-size: 21px; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 
@@ -164,7 +165,7 @@ tbody tr:hover { background: rgba(15, 118, 110, 0.05); }
   gap: 6px;
   padding: 4px 11px;
   border-radius: 999px;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   background: rgba(72, 53, 36, 0.07);
   color: var(--muted);
@@ -225,15 +226,48 @@ tbody tr:hover { background: rgba(15, 118, 110, 0.05); }
 .footer {
   margin: 24px 0 0;
   color: var(--muted);
-  font-size: 15px;
+  font-size: 17px;
   line-height: 1.6;
   max-width: 78ch;
 }
 
-/* Below this width seven columns stop fitting, so each row becomes a card and
+/* Seven nowrap columns need 1074px, which is wider than a lot of laptop windows.
+   Rather than drop straight to cards, shed the secondary columns as space runs
+   out and keep a real table for as long as possible. Measured natural widths:
+   all 7 = 1074px, without cost = 959px, rank+name+tokens+clis = 727px.
+   The ranges are bounded below so these never fight the card layout, where every
+   field is shown again with its own label. */
+@media (min-width: 541px) and (max-width: 1180px) {
+  .col-cost { display: none; }
+}
+
+@media (min-width: 541px) and (max-width: 1045px) {
+  .col-extra { display: none; }
+
+  /* With full labels the CLIs column measured 372px, 2.4x the next widest
+     column and 35% of the whole board. Collapsing each chip to its colour dot
+     brings the table to roughly half that, which is what lets a real table
+     survive in a narrow window instead of falling back to stacked cards. The
+   table is kept down to 541px, which leaves headroom over its 494px need;
+   521-522px clipped by 1-2px, so the cards start a little earlier than the
+   arithmetic strictly requires. */
+  .chip { padding: 5px; gap: 0; }
+  .chip::before { width: 11px; height: 11px; }
+  .chip-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* Below this width four columns stop fitting, so each row becomes a card and
    every value carries its own label. Sideways scrolling hid most of the board
-   on a phone, which is worse than no board. */
-@media (max-width: 900px) {
+   on a phone, which is worse than no board. Chips show their full labels again
+   here, since the dots-only rule above stops at 541px. */
+@media (max-width: 540px) {
   .table-wrap { overflow-x: visible; }
 
   thead {
@@ -277,16 +311,23 @@ tbody tr:hover { background: rgba(15, 118, 110, 0.05); }
     align-items: baseline;
     justify-content: space-between;
     gap: 16px;
-    padding: 9px 16px;
+    padding: 6px 15px;
     border-bottom: 0;
     white-space: normal;
     text-align: right;
   }
 
+  /* Requests, sessions and cost are metadata beside the headline numbers, so
+     they are set smaller to keep each card from towering on a phone. */
+  .col-extra,
+  .col-cost { font-size: 15px; }
+  .col-extra::before,
+  .col-cost::before { font-size: 12px; }
+
   td::before {
     content: attr(data-label);
     flex: none;
-    font-size: 12px;
+    font-size: 13px;
     letter-spacing: 0.09em;
     text-transform: uppercase;
     color: var(--muted);
@@ -328,10 +369,10 @@ tbody tr:hover { background: rgba(15, 118, 110, 0.05); }
 }
 
 @media (max-width: 560px) {
-  body { font-size: 16px; }
+  body { font-size: 17px; }
   .page { width: calc(100vw - 24px); padding: 16px 0 40px; }
   .hero, .panel { border-radius: 20px; }
   .hero-meta { gap: 18px 28px; }
-  .col-name { font-size: 19px; }
-  .col-tokens { font-size: 20px; }
+  .col-name { font-size: 22px; }
+  .col-tokens { font-size: 24px; }
 }

@@ -152,6 +152,9 @@ const server = createServer(async (req, res) => {
     return;
   }
   res.setHeader("Content-Type", CONTENT_TYPES[extname(filePath)] ?? "application/octet-stream");
+  // Without this the browser heuristically caches CSS and you end up staring at
+  // a stale layout after every edit and wrongly concluding nothing changed.
+  res.setHeader("Cache-Control", "no-store, must-revalidate");
   res.end(readFileSync(filePath));
 });
 
